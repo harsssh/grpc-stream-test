@@ -33,23 +33,19 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// ChatServiceSendMessageProcedure is the fully-qualified name of the ChatService's SendMessage RPC.
-	ChatServiceSendMessageProcedure = "/chat.v1.ChatService/SendMessage"
-	// ChatServiceGetMessagesProcedure is the fully-qualified name of the ChatService's GetMessages RPC.
-	ChatServiceGetMessagesProcedure = "/chat.v1.ChatService/GetMessages"
+	// ChatServiceChatStreamProcedure is the fully-qualified name of the ChatService's ChatStream RPC.
+	ChatServiceChatStreamProcedure = "/chat.v1.ChatService/ChatStream"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	chatServiceServiceDescriptor           = v1.File_chat_v1_chat_proto.Services().ByName("ChatService")
-	chatServiceSendMessageMethodDescriptor = chatServiceServiceDescriptor.Methods().ByName("SendMessage")
-	chatServiceGetMessagesMethodDescriptor = chatServiceServiceDescriptor.Methods().ByName("GetMessages")
+	chatServiceServiceDescriptor          = v1.File_chat_v1_chat_proto.Services().ByName("ChatService")
+	chatServiceChatStreamMethodDescriptor = chatServiceServiceDescriptor.Methods().ByName("ChatStream")
 )
 
 // ChatServiceClient is a client for the chat.v1.ChatService service.
 type ChatServiceClient interface {
-	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error)
-	GetMessages(context.Context, *connect.Request[v1.GetMessagesRequest]) (*connect.ServerStreamForClient[v1.GetMessagesResponse], error)
+	ChatStream(context.Context) *connect.BidiStreamForClient[v1.ChatStreamRequest, v1.ChatStreamResponse]
 }
 
 // NewChatServiceClient constructs a client for the chat.v1.ChatService service. By default, it uses
@@ -62,16 +58,10 @@ type ChatServiceClient interface {
 func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ChatServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
 	return &chatServiceClient{
-		sendMessage: connect.NewClient[v1.SendMessageRequest, v1.SendMessageResponse](
+		chatStream: connect.NewClient[v1.ChatStreamRequest, v1.ChatStreamResponse](
 			httpClient,
-			baseURL+ChatServiceSendMessageProcedure,
-			connect.WithSchema(chatServiceSendMessageMethodDescriptor),
-			connect.WithClientOptions(opts...),
-		),
-		getMessages: connect.NewClient[v1.GetMessagesRequest, v1.GetMessagesResponse](
-			httpClient,
-			baseURL+ChatServiceGetMessagesProcedure,
-			connect.WithSchema(chatServiceGetMessagesMethodDescriptor),
+			baseURL+ChatServiceChatStreamProcedure,
+			connect.WithSchema(chatServiceChatStreamMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -79,24 +69,17 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // chatServiceClient implements ChatServiceClient.
 type chatServiceClient struct {
-	sendMessage *connect.Client[v1.SendMessageRequest, v1.SendMessageResponse]
-	getMessages *connect.Client[v1.GetMessagesRequest, v1.GetMessagesResponse]
+	chatStream *connect.Client[v1.ChatStreamRequest, v1.ChatStreamResponse]
 }
 
-// SendMessage calls chat.v1.ChatService.SendMessage.
-func (c *chatServiceClient) SendMessage(ctx context.Context, req *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error) {
-	return c.sendMessage.CallUnary(ctx, req)
-}
-
-// GetMessages calls chat.v1.ChatService.GetMessages.
-func (c *chatServiceClient) GetMessages(ctx context.Context, req *connect.Request[v1.GetMessagesRequest]) (*connect.ServerStreamForClient[v1.GetMessagesResponse], error) {
-	return c.getMessages.CallServerStream(ctx, req)
+// ChatStream calls chat.v1.ChatService.ChatStream.
+func (c *chatServiceClient) ChatStream(ctx context.Context) *connect.BidiStreamForClient[v1.ChatStreamRequest, v1.ChatStreamResponse] {
+	return c.chatStream.CallBidiStream(ctx)
 }
 
 // ChatServiceHandler is an implementation of the chat.v1.ChatService service.
 type ChatServiceHandler interface {
-	SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error)
-	GetMessages(context.Context, *connect.Request[v1.GetMessagesRequest], *connect.ServerStream[v1.GetMessagesResponse]) error
+	ChatStream(context.Context, *connect.BidiStream[v1.ChatStreamRequest, v1.ChatStreamResponse]) error
 }
 
 // NewChatServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -105,24 +88,16 @@ type ChatServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	chatServiceSendMessageHandler := connect.NewUnaryHandler(
-		ChatServiceSendMessageProcedure,
-		svc.SendMessage,
-		connect.WithSchema(chatServiceSendMessageMethodDescriptor),
-		connect.WithHandlerOptions(opts...),
-	)
-	chatServiceGetMessagesHandler := connect.NewServerStreamHandler(
-		ChatServiceGetMessagesProcedure,
-		svc.GetMessages,
-		connect.WithSchema(chatServiceGetMessagesMethodDescriptor),
+	chatServiceChatStreamHandler := connect.NewBidiStreamHandler(
+		ChatServiceChatStreamProcedure,
+		svc.ChatStream,
+		connect.WithSchema(chatServiceChatStreamMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/chat.v1.ChatService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case ChatServiceSendMessageProcedure:
-			chatServiceSendMessageHandler.ServeHTTP(w, r)
-		case ChatServiceGetMessagesProcedure:
-			chatServiceGetMessagesHandler.ServeHTTP(w, r)
+		case ChatServiceChatStreamProcedure:
+			chatServiceChatStreamHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -132,10 +107,6 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 // UnimplementedChatServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedChatServiceHandler struct{}
 
-func (UnimplementedChatServiceHandler) SendMessage(context.Context, *connect.Request[v1.SendMessageRequest]) (*connect.Response[v1.SendMessageResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("chat.v1.ChatService.SendMessage is not implemented"))
-}
-
-func (UnimplementedChatServiceHandler) GetMessages(context.Context, *connect.Request[v1.GetMessagesRequest], *connect.ServerStream[v1.GetMessagesResponse]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("chat.v1.ChatService.GetMessages is not implemented"))
+func (UnimplementedChatServiceHandler) ChatStream(context.Context, *connect.BidiStream[v1.ChatStreamRequest, v1.ChatStreamResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("chat.v1.ChatService.ChatStream is not implemented"))
 }
