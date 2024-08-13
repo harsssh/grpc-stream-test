@@ -1,0 +1,17 @@
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: grpc-stream-test/gen
+inputs:
+  - directory: proto
+plugins:
+  - remote: buf.build/connectrpc/go:v1.16.2
+    out: gen
+    opt:
+      - paths=source_relative
+  - remote: buf.build/protocolbuffers/go
+    out: gen
+    opt:
+      - paths=source_relative
